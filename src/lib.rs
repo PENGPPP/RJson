@@ -36,6 +36,15 @@ mod tests {
         };
     }
 
+    macro_rules! assert_eq_n_js {
+        ($x:expr, $y:expr) => {
+            match $x {
+                Ok(JsonStruct::Number(num)) if num == $y => (),
+                _ => panic!("parse num error!!"),
+            }
+        };
+    }
+
     #[test]
     fn test_parse() {
         assert_eq_r!(parse("null"), Ok(JsonStruct::Null));
@@ -47,6 +56,8 @@ mod tests {
         assert_eq_r!(parse("tru"), Err(ParseError::ValueError));
         assert_eq_r!(parse("nul"), Err(ParseError::ValueError));
         assert_eq_r!(parse("f"), Err(ParseError::ValueError));
+
+        assert_eq_n_js!(parse("100"), 100.0);
     }
 
     #[test]

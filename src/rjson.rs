@@ -29,7 +29,7 @@ pub fn parse(json: &str) -> Result<JsonStruct, ParseError> {
             "n" => parse_for_null(json),
             "f" => parse_for_false(json),
             "t" => parse_for_true(json),
-            _ => Err(ParseError::ValueError),
+            _ => parse_for_number(json),
         };
 
         match result {
