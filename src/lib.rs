@@ -45,6 +45,27 @@ mod tests {
         };
     }
 
+    macro_rules! assert_eq_str {
+        ($x:expr, $y:expr, $z:expr) => {
+            match $x {
+                Ok(PareseResult {
+                    json,
+                    json_struct: JsonStruct::Str(s),
+                }) if s == $y && json == $z => (),
+                _ => panic!("parse num error!!"),
+            }
+        };
+    }
+
+    macro_rules! assert_eq_str_js {
+        ($x:expr, $y:expr) => {
+            match $x {
+                Ok(JsonStruct::Str(s)) if s == $y => (),
+                _ => panic!("parse num error!!"),
+            }
+        };
+    }
+
     #[test]
     fn test_parse() {
         assert_eq_r!(parse("null"), Ok(JsonStruct::Null));
@@ -58,6 +79,9 @@ mod tests {
         assert_eq_r!(parse("f"), Err(ParseError::ValueError));
 
         assert_eq_n_js!(parse("100"), 100.0);
+
+        assert_eq_str_js!(parse("\"hello,world\""), "hello,world");
+        assert_eq_str_js!(parse("\"\""), "");
     }
 
     #[test]
@@ -169,5 +193,18 @@ mod tests {
         assert_eq_n_r!(parse_for_number("1.234E+10"), 1.234E+10, "");
         assert_eq_n_r!(parse_for_number("1.234E-10"), 1.234E-10, "");
         assert_eq_n_r!(parse_for_number("0.0"), 1e-10000, "");
+
+        assert_neq_r!(parse_for_number("+0"), Err(ParseError::ValueError));
+        assert_neq_r!(parse_for_number("008"), Err(ParseError::ValueError));
+        assert_neq_r!(parse_for_number(".123"), Err(ParseError::ValueError));
+        assert_neq_r!(parse_for_number("123."), Err(ParseError::ValueError));
+    }
+
+    #[test]
+    fn test_str_parse() {
+        assert_eq_str!(parse_for_string("\"hello,world\""), String::from("hello,world"), "");
+        assert_eq_str!(parse_for_string("\"hello,world     \"   "), String::from("hello,world     "), "   ");
+        assert_eq_str!(parse_for_string("\"\""), String::from(""), "");
+        assert_eq_str!(parse_for_string("\"Hello\\nWorld\""), String::from("Hello\\nWorld"), "");
     }
 }

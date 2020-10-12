@@ -29,6 +29,7 @@ pub fn parse(json: &str) -> Result<JsonStruct, ParseError> {
             "n" => parse_for_null(json),
             "f" => parse_for_false(json),
             "t" => parse_for_true(json),
+            "\"" => parse_for_string(json),
             _ => parse_for_number(json),
         };
 
@@ -39,6 +40,20 @@ pub fn parse(json: &str) -> Result<JsonStruct, ParseError> {
     } else {
         Ok(JsonStruct::Null)
     };
+}
+
+pub fn parse_for_string(json: &str) -> Result<PareseResult, ParseError> {
+    if &json[..1] == "\"" {
+        for (i, &item) in json[1..].as_bytes().iter().enumerate() {
+            if item == b'"' {
+                return Ok(PareseResult {
+                    json: &json[i + 2..json.len()],
+                    json_struct: JsonStruct::Str(String::from(&json[1..i + 1])),
+                });
+            }
+        }
+    }
+    Err(ParseError::ValueError)
 }
 
 pub fn parse_for_true(json: &str) -> Result<PareseResult, ParseError> {
