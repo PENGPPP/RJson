@@ -4,6 +4,11 @@ use std::str::Chars;
 #[derive(Debug)]
 pub enum ParseError {
     ValueError,
+    LeftQuotationMissing,
+    RightQuotationMissing,
+    ObjNameError,
+    ColonMissing,
+    ObjectContentIncomplete,
 }
 
 #[derive(Debug)]
@@ -20,6 +25,12 @@ pub enum JsonStruct {
 pub struct ParseResult<'a> {
     pub json: &'a str,
     pub json_struct: JsonStruct,
+}
+
+#[derive(Debug)]
+pub struct ParseStringResult<'a> {
+    pub json: &'a str,
+    pub str_value: &'a str,
 }
 
 pub fn parse(json: &str) -> Result<JsonStruct, ParseError> {
@@ -42,11 +53,65 @@ pub fn parse_value(json: &str) -> Result<ParseResult, ParseError>{
             "t" => parse_for_literal(json, "true", JsonStruct::Boolean(true)),
             "\"" => parse_for_string(json),
             "[" => parse_for_array(json),
+            "{" => parse_for_obj(json),
             _ => parse_for_number(json),
         }
     } else {
         Err(ParseError::ValueError)
     }
+}
+
+pub fn parse_for_obj(json: &str) -> Result<ParseResult, ParseError>{
+    if &json[..1] == "{" && json.len() > 1 {
+        let mut obj_map = HashMap::new();
+        let mut json_parse = &json[1..];
+        loop {
+            let mut obj_key = String::new();
+            json_parse = match skip_white_space(&json_parse) {
+                Ok(json) if &json[..1] == "\"" => json,
+                _ => return Err(ParseError::LeftQuotationMissing)
+            };
+
+            json_parse = match parse_for_string_value(&json_parse) {
+                Ok(result) => {
+                    obj_key.push_str(result.str_value);
+                    result.json
+                },
+                Err(_) => return Err(ParseError::ObjNameError)
+            };
+
+            json_parse = match skip_white_space(json_parse) {
+                Ok(json) if &json[..1] == ":" => &json[1..],
+                _ => return Err(ParseError::ColonMissing)
+            };
+
+            json_parse = match parse_value(json_parse) {
+                Ok(result) => {
+                    obj_map.insert(obj_key, result.json_struct);
+                    result.json
+                },
+                Err(e) => {
+                    println!("============");
+                    return Err(e);
+                }
+            };
+
+            if json_parse.len() > 0 {
+                if &json_parse[..1] == "}"{
+                    return Ok(ParseResult{
+                        json: &json_parse[1..],
+                        json_struct: JsonStruct::Object(obj_map)
+                    })
+                } else if &json_parse[..1] == "," {
+                    json_parse = &json_parse[1..]
+                } else {
+                    return Err(ParseError::ObjectContentIncomplete)
+                }
+            }
+        }
+    }
+
+    Err(ParseError::ValueError)
 }
 
 pub fn parse_for_array(json: &str) -> Result<ParseResult, ParseError>{
@@ -92,6 +157,20 @@ pub fn parse_for_string(json: &str) -> Result<ParseResult, ParseError> {
                 return Ok(ParseResult {
                     json: &json[i + 2..json.len()],
                     json_struct: JsonStruct::Str(String::from(&json[1..i + 1])),
+                });
+            }
+        }
+    }
+    Err(ParseError::ValueError)
+}
+
+pub fn parse_for_string_value(json: &str) -> Result<ParseStringResult, ParseError> {
+    if &json[..1] == "\"" {
+        for (i, &item) in json[1..].as_bytes().iter().enumerate() {
+            if item == b'"' {
+                return Ok(ParseStringResult {
+                    json: &json[i + 2..json.len()],
+                    str_value: &json[1..i + 1],
                 });
             }
         }

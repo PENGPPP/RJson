@@ -68,20 +68,20 @@ mod tests {
 
     #[test]
     fn test_parse() {
-        // assert_eq_r!(parse("null"), Ok(JsonStruct::Null));
-        // assert_eq_r!(parse("false"), Ok(JsonStruct::Boolean(false)));
-        // assert_neq_r!(parse("false"), Ok(JsonStruct::Boolean(true)));
-        // assert_eq_r!(parse("true"), Ok(JsonStruct::Boolean(true)));
-        // assert_neq_r!(parse("true"), Ok(JsonStruct::Boolean(false)));
+        assert_eq_r!(parse("null"), Ok(JsonStruct::Null));
+        assert_eq_r!(parse("false"), Ok(JsonStruct::Boolean(false)));
+        assert_neq_r!(parse("false"), Ok(JsonStruct::Boolean(true)));
+        assert_eq_r!(parse("true"), Ok(JsonStruct::Boolean(true)));
+        assert_neq_r!(parse("true"), Ok(JsonStruct::Boolean(false)));
 
-        // assert_eq_r!(parse("tru"), Err(ParseError::ValueError));
-        // assert_eq_r!(parse("nul"), Err(ParseError::ValueError));
-        // assert_eq_r!(parse("f"), Err(ParseError::ValueError));
+        assert_eq_r!(parse("tru"), Err(ParseError::ValueError));
+        assert_eq_r!(parse("nul"), Err(ParseError::ValueError));
+        assert_eq_r!(parse("f"), Err(ParseError::ValueError));
 
-        // assert_eq_n_js!(parse("100"), 100.0);
+        assert_eq_n_js!(parse("100"), 100.0);
 
-        // assert_eq_str_js!(parse("\"hello,world\""), "hello,world");
-        // assert_eq_str_js!(parse("\"\""), "");
+        assert_eq_str_js!(parse("\"hello,world\""), "hello,world");
+        assert_eq_str_js!(parse("\"\""), "");
     }
 
     #[test]
@@ -220,5 +220,13 @@ mod tests {
 
         assert_eq_r!(result, Ok(ParseResult{json:_, json_struct: JsonStruct::Array(_)}))
 
+    }
+
+    #[test]
+    fn test_obj_parse(){
+        println!("parse obj: {:?}", parse_for_obj("{\"json\" : 1000}"));
+        println!("parse obj: {:?}", parse_for_obj("{\"json\" : 1000, \"gg\": \"gg value\"}"));
+        println!("parse obj: {:?}", parse_for_obj("{\"json\" : 1000, \"gg\": \"gg value\", \"subobj\": {\"subobjkkk\": \"subobjvvv\", \"\":[100,\"hello\",3.14,true,false,10003,[1,2,\"\",3]]}}"));
+        println!("parse obj: {:?}", parse_for_obj("{\"json\" : 1000, \"gg\": \"gg value\", \"\":[100,\"hello\",3.14,true,false,10003,[1,2,\"\",3]]}"));
     }
 }
