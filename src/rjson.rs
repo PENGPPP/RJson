@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::Chars;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -16,7 +17,7 @@ pub enum JsonStruct {
 }
 
 #[derive(Debug)]
-pub struct PareseResult<'a> {
+pub struct ParseResult<'a> {
     pub json: &'a str,
     pub json_struct: JsonStruct,
 }
@@ -24,29 +25,71 @@ pub struct PareseResult<'a> {
 pub fn parse(json: &str) -> Result<JsonStruct, ParseError> {
     return if json.len() <= 0 {
         Ok(JsonStruct::Null)
-    } else if let Ok(json) = skip_white_space(json) {
-        let result = match &json[..1] {
-            "n" => parse_for_null(json),
-            "f" => parse_for_false(json),
-            "t" => parse_for_true(json),
-            "\"" => parse_for_string(json),
-            _ => parse_for_number(json),
-        };
-
-        match result {
-            Ok(PareseResult { json, json_struct }) => Ok(json_struct),
-            Err(e) => Err(e),
-        }
     } else {
-        Ok(JsonStruct::Null)
+        match parse_value(json) {
+            Ok(result) => Ok(result.json_struct),
+            Err(e) => Err(e)
+        }
     };
 }
 
-pub fn parse_for_string(json: &str) -> Result<PareseResult, ParseError> {
+pub fn parse_value(json: &str) -> Result<ParseResult, ParseError>{
+    let result = skip_white_space(json);
+    if let Ok(json) = result {
+        match &json[..1] {
+            "n" => parse_for_literal(json, "null", JsonStruct::Null),
+            "f" => parse_for_literal(json, "false", JsonStruct::Boolean(false)),
+            "t" => parse_for_literal(json, "true", JsonStruct::Boolean(true)),
+            "\"" => parse_for_string(json),
+            "[" => parse_for_array(json),
+            _ => parse_for_number(json),
+        }
+    } else {
+        Err(ParseError::ValueError)
+    }
+}
+
+pub fn parse_for_array(json: &str) -> Result<ParseResult, ParseError>{
+
+    if &json[..1] == "[" && json.len() > 1 {
+        let mut v = Vec::new();
+        let mut json_parsed = &json[1..];
+
+        loop{
+            match &json_parsed[..1] {
+                "]" => {
+                    return Ok(ParseResult {
+                        json: &json_parsed[1..],
+                        json_struct: JsonStruct::Array(v),
+                    });
+                },
+                "," => {
+                    json_parsed = &json_parsed[1..];
+                },
+                _ => {
+                    match parse_value(&json_parsed[..]) {
+                        Ok(ParseResult{
+                            json, json_struct,
+                        }) => {
+                            v.push(json_struct);
+                            json_parsed = json;
+                        },
+                        Err(e) => return Err(e)
+                    };
+                }
+            }
+        }
+
+    }
+
+    Err(ParseError::ValueError)
+}
+
+pub fn parse_for_string(json: &str) -> Result<ParseResult, ParseError> {
     if &json[..1] == "\"" {
         for (i, &item) in json[1..].as_bytes().iter().enumerate() {
             if item == b'"' {
-                return Ok(PareseResult {
+                return Ok(ParseResult {
                     json: &json[i + 2..json.len()],
                     json_struct: JsonStruct::Str(String::from(&json[1..i + 1])),
                 });
@@ -56,70 +99,111 @@ pub fn parse_for_string(json: &str) -> Result<PareseResult, ParseError> {
     Err(ParseError::ValueError)
 }
 
-pub fn parse_for_true(json: &str) -> Result<PareseResult, ParseError> {
-    return if json.len() < 4 {
-        Err(ParseError::ValueError)
-    } else if &json[0..1] == "t" && &json[1..2] == "r" && &json[2..3] == "u" && &json[3..4] == "e" {
-        Ok(PareseResult {
-            json: &json[4..json.len()],
-            json_struct: JsonStruct::Boolean(true),
-        })
+pub fn parse_for_literal<'a> (json: & 'a str, literal: &str, json_struct: JsonStruct) -> Result<ParseResult<'a>, ParseError> {
+    if json.len() < literal.len() {
+        return Err(ParseError::ValueError)
     } else {
-        Err(ParseError::ValueError)
-    };
-}
-
-pub fn parse_for_false(json: &str) -> Result<PareseResult, ParseError> {
-    return if json.len() < 5 {
-        Err(ParseError::ValueError)
-    } else if &json[0..1] == "f"
-        && &json[1..2] == "a"
-        && &json[2..3] == "l"
-        && &json[3..4] == "s"
-        && &json[4..5] == "e"
-    {
-        Ok(PareseResult {
-            json: &json[5..json.len()],
-            json_struct: JsonStruct::Boolean(false),
+        for i in 0..literal.len() {
+            if &json[i..i+1] != &literal[i..i+1] {
+                return Err(ParseError::ValueError)
+            }
+        }
+        return Ok(ParseResult {
+            json: &json[literal.len()..],
+            json_struct,
         })
-    } else {
-        Err(ParseError::ValueError)
-    };
-}
-
-pub fn parse_for_null(json: &str) -> Result<PareseResult, ParseError> {
-    return if json.len() < 4 {
-        Err(ParseError::ValueError)
-    } else if &json[0..1] == "n" && &json[1..2] == "u" && &json[2..3] == "l" && &json[3..4] == "l" {
-        Ok(PareseResult {
-            json: &json[4..json.len()],
-            json_struct: JsonStruct::Null,
-        })
-    } else {
-        Err(ParseError::ValueError)
-    };
-}
-
-pub fn parse_for_number(json: &str) -> Result<PareseResult, ParseError> {
-    for (i, &item) in json.as_bytes().iter().enumerate() {
-        let end = if item == b' ' || item == b'\t' || item == b'\n' || item == b'\r' {
-            i
-        } else if i == (json.len() - 1) {
-            json.len()
-        } else {
-            continue;
-        };
-
-        return match &json[..end].parse::<f32>() {
-            Ok(num) => Ok(PareseResult {
-                json: &json[end..],
-                json_struct: JsonStruct::Number(*num),
-            }),
-
-            Err(_) => Err(ParseError::ValueError),
-        };
     }
-    return Err(ParseError::ValueError);
+}
+
+pub fn parse_for_number(json: &str) -> Result<ParseResult, ParseError> {
+    let mut index:usize = 0;
+    let mut chars = json.chars();
+    let mut check_c = chars.next();
+
+    if check_c == Some('-') {
+        index+=1;
+        check_c = chars.next();
+    }
+
+    match check_c {
+        Some(c) => {
+            if c == '0' {
+                index+=1;
+                check_c = chars.next();
+            } else {
+        
+                if !is_digit_1t9(&c) {
+                    return Err(ParseError::ValueError)
+                }
+                skip_for_num(&mut chars, &mut check_c, &mut index);
+            }
+        },
+        _ => ()
+    }
+
+    if check_c == Some('.') {
+        index+=1;
+        check_c = chars.next();
+
+        match check_c {
+            Some(c) => {
+                if !is_digit(&c) {
+                    return Err(ParseError::ValueError)
+                }
+                skip_for_num(&mut chars, &mut check_c, &mut index);
+            },
+            _ => ()
+        }
+
+    }
+
+    if check_c == Some('e') || check_c == Some('E') {
+        index+=1;
+        check_c = chars.next();
+        
+        if check_c == Some('+') || check_c == Some('-') {
+            index+=1;
+            check_c = chars.next();
+        }
+
+        match check_c {
+            Some(c) => {
+                if !is_digit(&c) {
+                    return Err(ParseError::ValueError)
+                }
+                skip_for_num(&mut chars, &mut check_c, &mut index);
+            },
+            _ => ()
+        }
+    }
+
+    return match &json[..index].parse::<f32>() {
+        Ok(num) => Ok(ParseResult {
+            json: &json[index..],
+            json_struct: JsonStruct::Number(*num),
+        }),
+
+        Err(_) => Err(ParseError::ValueError),
+    };
+} 
+
+fn skip_for_num(chars: &mut Chars, check_c: &mut Option<char>, index: &mut usize){
+    while let Some(c) = check_c {
+        if is_digit(&c) {
+            *index = *index + 1;
+            *check_c = chars.next();
+        } else {
+            break
+        }
+    }
+}
+
+fn is_digit_1t9(d: &char) -> bool {
+    *d >= '1' && *d <= '9'
+}
+
+fn is_digit(d: &char) -> bool {
+    *d >= '0' && *d <= '9'
 }
 
 pub fn skip_white_space(json: &str) -> Result<&str, ParseError> {
